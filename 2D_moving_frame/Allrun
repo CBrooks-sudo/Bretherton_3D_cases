@@ -1,0 +1,50 @@
+#!/bin/sh
+cd "${0%/*}" || exit 1                          # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions    # Tutorial run functions
+#------------------------------------------------------------------------------
+# Taylor bubble, Ca = 0.002, 2D axisymmetric wedge, interFlow (TwoPhaseFlow)
+#
+# Usage:
+#   ./Allrun        run on 1 core  (serial)
+#   ./Allrun 4      run on 4 cores (parallel; check your core count with: nproc)
+#
+# 0.orig/alpha.bubble is ALREADY initialised: a smooth (volume-fraction exact)
+# bubble made for the geometry and bubble size in simSetup. So no setFields or
+# initAlphaField step is run here. If you change the mesh or bubble entries in
+# simSetup (R, LtoR, hWallToR, nx1, nx2, firstToLastAR, alpha, RbToR, LbToR,
+# xb0ToR) that field no longer matches and must be regenerated first.
+#------------------------------------------------------------------------------
+
+nProcs="${1:-1}"
+
+case "$nProcs" in
+    ''|*[!0-9]*|0)
+        echo "Usage: ./Allrun [number of cores]   e.g. ./Allrun 4"
+        exit 1
+        ;;
+esac
+
+if [ -f log.blockMesh ]
+then
+    echo "This case has already been run. Run ./Allclean first, then ./Allrun again."
+    exit 1
+fi
+
+# Fresh working copy of the initial fields
+rm -rf 0
+cp -r 0.orig 0
+
+runApplication blockMesh
+runApplication checkMesh
+
+if [ "$nProcs" -eq 1 ]
+then
+    runApplication interFlow
+else
+    sed -i "s/^numberOfSubdomains.*/numberOfSubdomains $nProcs;/" system/decomposeParDict
+    runApplication decomposePar
+    runParallel interFlow
+    runApplication reconstructPar
+fi
+
+#------------------------------------------------------------------------------
