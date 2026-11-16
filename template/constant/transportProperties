@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.6                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "../simSetup"
+
+nul #calc "2.0*$Ul*$R/$Re";
+nug #calc "$nul/$viscosityRatio*$densityRatio";
+rhog #calc "$rhol/$densityRatio";
+surfTens #calc "$rhol*$nul*$Ul/$Ca"; 
+
+phases (bubble liquid);
+
+bubble
+{
+    transportModel  Newtonian;
+    nu              nu [ 0 2 -1 0 0 0 0 ] $nug;
+    rho             rho [ 1 -3 0 0 0 0 0 ] $rhog;
+}
+
+liquid
+{
+    transportModel  Newtonian;
+    nu              nu [ 0 2 -1 0 0 0 0 ] $nul;
+     rho             rho [ 1 -3 0 0 0 0 0 ] $rhol;
+}
+
+sigma           sigma [ 1 0 -2 0 0 0 0 ] $surfTens;
+
+surfaceForces
+{
+  sigma $surfTens;
+  curvatureModel RDF;
+  accelerationModel gravity;
+  gravity (0 0 0);
+  deltaFunctionModel alphaCSF;
+} 
+// ************************************************************************* //
