@@ -1,0 +1,110 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.3.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [ 0 1 -1 0 0 0 0 ];
+
+#include "../simSetup"
+
+// liquid initially at rest in the lab frame, i.e. moving at -Uf relative to frame
+internalField uniform ($UwallX 0 0 );
+
+boundaryField
+{
+    inlet
+    {
+        // Developed (Poiseuille) lab-frame profile with mean Ul, minus the frame velocity:
+        //   u(r) = 2 Ul (1 - r^2/R^2) - Uf
+        type            codedFixedValue;
+        value           uniform ($UwallX 0 0);
+        name            movingFrameInlet;
+
+        Ul              $Ul;
+        Uf              $Uf;
+        R               $R
+
+        codeInclude
+        #{
+            #include "uniformDimensionedFields.H"
+        #};
+
+        code
+        #{
+            const scalar Ul = $Ul;
+                        scalar Uf = $Uf;   // starting value, used until the controller has run once
+            if (this->db().foundObject<uniformDimensionedScalarField>("Uframe"))
+            {
+                Uf = this->db().lookupObject<uniformDimensionedScalarField>("Uframe").value();
+            }
+            const scalar R  = $R;
+
+            const vectorField& Cf = patch().Cf();
+            vectorField Up(Cf.size(), Zero);
+
+            forAll(Cf, facei)
+            {
+                const scalar r2 = sqr(Cf[facei].y()) + sqr(Cf[facei].z());
+                Up[facei] = vector(2.0*Ul*(1.0 - r2/sqr(R)) - Uf, 0, 0);
+            }
+
+            operator==(Up);
+        #};
+    }
+
+        upper_wall
+    {
+        // v2: wall at rest in the lab slides backwards at -Uf(t), Uf taken from the controller
+        type            codedFixedValue;
+        value           uniform ($UwallX 0 0);
+        name            movingFrameWall;
+
+        Uf              $Uf;
+
+        codeInclude
+        #{
+            #include "uniformDimensionedFields.H"
+        #};
+
+        code
+        #{
+            scalar Uf = $Uf;   // starting value, used until the controller has run once
+            if (this->db().foundObject<uniformDimensionedScalarField>("Uframe"))
+            {
+                Uf = this->db().lookupObject<uniformDimensionedScalarField>("Uframe").value();
+            }
+            operator==(vector(-Uf, 0, 0));
+        #};
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    front
+    {
+        type            wedge;
+    }
+    back
+    {
+        type            wedge;
+    }
+    lower_wall
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //

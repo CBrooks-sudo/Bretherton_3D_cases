@@ -1,0 +1,234 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.6                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+#include "../simSetup"
+tEnd 10.0; // moving frame: Fixed was defined by tube length
+writedt #calc "$tEnd/20.0";
+dt1 #calc "$Co*$R/$nx1/$Ul/100.0";
+
+application     interFlow;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         $tEnd;
+
+deltaT          4e-5;//$dt1;
+
+writeControl    adjustableRunTime;
+
+writeInterval   $writedt;
+
+purgeWrite      2;
+
+writeFormat     binary;
+
+writePrecision  10;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;//yes;
+
+maxCo           $Co;
+maxAlphaCo      $Co;
+
+maxDeltaT       1;
+maxCapillaryNum 1000;
+
+libs
+(
+    "libpostProcess.so"
+);
+
+
+functions
+{   
+   freeSurface
+   {
+       type            surfaces;
+       libs            ("libsampling.so");
+       writeControl timeStep; // execute the codeWrite every writeInterval time steps
+       writeInterval 2000;
+       surfaceFormat  raw;
+       fields
+       (
+           alpha.bubble
+       );
+       surfaces
+       (
+           freeSurface
+           {
+               type        isoSurfaceCell;
+               isoField    alpha.bubble;
+               isoValue    0.5;
+               interpolate false;
+               regularise  false;
+           }
+       );
+       interpolationScheme cellPointFace;
+   }
+
+   bubbleVol
+   {
+       libs ("libutilityFunctionObjects.so");
+       type coded;
+       name bubbleVol;
+       writeControl timeStep; // execute the codeWrite every writeInterval time steps
+       writeInterval 10;
+       active yes;
+       codeWrite
+       #{
+            const volScalarField& alpha = mesh().lookupObject<volScalarField>("alpha.bubble"); // alpha.water should be replaced with the name of the variable to be processed
+            scalar bubbleV(0); // definition of the scalar that will take the droplet volume
+            vector bubbleX(vector::zero); // definition of the vector that will take the droplet center of gravity
+            bubbleV = fvc::domainIntegrate(alpha).value(); // evaluation of droplet volume
+            bubbleX = fvc::domainIntegrate(alpha*mesh().C()).value()/bubbleV; // evaluation of droplet center of gravity
+            
+            Info<< "Bubble volume [m3] = " << bubbleV << "; position (xG yG zG) [m]: " << bubbleX <<endl;   // output to screen 
+            
+            if (Pstream::master()){  // Necessary when running in parallel, otherwise every core outputs the results     
+               std::ofstream file;
+               file.open ("bubbleInfo", std::ofstream::out | std::ofstream::app); // bubbleInfo is the name of the file that will be generated
+               file << mesh().time().value() << " , " << bubbleV << " , " << bubbleX.component(0) << " , " << bubbleX.component(1) << " , " << bubbleX.component(2) << std::endl; // time [s], volume [m3], xG [m], yG [m], zG [m] 
+               file.close(); // the file can be read in matlab with eval(sprintf('A=importdata(''dropInfo'');'));
+            }
+       #}; 
+   }
+      frameController
+   {
+       // v2 ADAPTIVE MOVING FRAME. Runs after every time step:
+       //   measures the bubble's position error e and drift velocity v (relative to the frame),
+       //   sets the frame acceleration a = 2v/tau + e/tau^2 (critically damped),
+       //   updates the frame velocity Uf, and stores Uf and a in the registry as
+       //   "Uframe" and "aFrame" for the U boundary conditions and system/fvOptions.
+       libs            ("libutilityFunctionObjects.so");
+       type            coded;
+       name            frameController;
+       executeControl  timeStep;
+       executeInterval 1;
+       writeControl    timeStep;
+       writeInterval   1;
+
+       Uf              $Uf;
+       tauFrame        $tauFrame;
+
+       codeInclude
+       #{
+           #include "uniformDimensionedFields.H"
+           #include <fstream>
+       #};
+
+       codeData
+       #{
+           bool   initialised_ = false;
+           scalar Uf_          = 0;   // current frame velocity
+           scalar xTarget_     = 0;   // target bubble centroid (frame coordinates)
+           scalar Xf_          = 0;   // distance the frame has travelled since t = 0
+       #};
+
+       codeExecute
+       #{
+           const scalar Uf0 = $Uf;
+           const scalar tau = $tauFrame;
+           const Time& runTime = mesh().time();
+           const scalar dt = runTime.deltaTValue();
+
+           const volScalarField& alpha = mesh().lookupObject<volScalarField>("alpha.bubble");
+           const volVectorField& U     = mesh().lookupObject<volVectorField>("U");
+
+           // bubble volume, centroid position and gas-volume-averaged velocity (frame-relative)
+           const scalar Vb = fvc::domainIntegrate(alpha).value();
+           const scalar xG = (fvc::domainIntegrate(alpha*mesh().C()).value()/Vb).x();
+           const scalar v  = (fvc::domainIntegrate(alpha*U).value()/Vb).x();
+
+           if (!initialised_)
+           {
+               Uf_ = Uf0;
+               xTarget_ = xG;            // hold the bubble where it started
+               regIOobject::store
+               (
+                   new uniformDimensionedScalarField
+                   (
+                       IOobject("Uframe", runTime.constant(), mesh(),
+                                IOobject::NO_READ, IOobject::NO_WRITE, true),
+                       dimensionedScalar("Uframe", dimVelocity, Uf0)
+                   )
+               );
+               regIOobject::store
+               (
+                   new uniformDimensionedScalarField
+                   (
+                       IOobject("aFrame", runTime.constant(), mesh(),
+                                IOobject::NO_READ, IOobject::NO_WRITE, true),
+                       dimensionedScalar("aFrame", dimAcceleration, 0)
+                   )
+               );
+               initialised_ = true;
+           }
+
+           const scalar e = xG - xTarget_;
+           const scalar a = 2.0*v/tau + e/sqr(tau);
+
+           Xf_ += Uf_*dt;                // the step just completed ran with the old Uf
+           const scalar UfOld = Uf_;
+           Uf_ += a*dt;                  // frame velocity for the next step
+
+           const_cast<uniformDimensionedScalarField&>
+           (
+               mesh().lookupObject<uniformDimensionedScalarField>("Uframe")
+           ).value() = Uf_;
+           const_cast<uniformDimensionedScalarField&>
+           (
+               mesh().lookupObject<uniformDimensionedScalarField>("aFrame")
+           ).value() = a;
+
+           if (runTime.timeIndex() % 10 == 0)
+           {
+               Info<< "frameController: Uf = " << Uf_ << "  a = " << a
+                   << "  e = " << e << "  v = " << v << endl;
+
+               if (Pstream::master())
+               {
+                   std::ofstream file("frameInfo", std::ofstream::out | std::ofstream::app);
+                   file.precision(10);
+                   // time, Uf used this step, a for next step, xG (frame), v, e, lab-frame centroid
+                   file << runTime.value() << " , " << UfOld << " , " << a << " , "
+                        << xG << " , " << v << " , " << e << " , " << xG + Xf_ << std::endl;
+               }
+           }
+       #};
+   }
+   vorticity1
+    {
+        type            vorticity;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+    }
+
+
+};
+
+
+// ************************************************************************* //
