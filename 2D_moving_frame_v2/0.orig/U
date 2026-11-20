@@ -43,13 +43,15 @@ boundaryField
 
         code
         #{
-            const scalar Ul = $Ul;
-                        scalar Uf = $Uf;   // starting value, used until the controller has run once
+                        // simSetup values, read from controlDict (which #includes simSetup)
+            const dictionary& setup = this->db().time().controlDict();
+            const scalar Ul = setup.get<scalar>("Ul");
+                        scalar Uf = setup.get<scalar>("Uf");   // starting value, used until the controller has run once
             if (this->db().foundObject<uniformDimensionedScalarField>("Uframe"))
             {
                 Uf = this->db().lookupObject<uniformDimensionedScalarField>("Uframe").value();
             }
-            const scalar R  = $R;
+            const scalar R  = setup.get<scalar>("R");
 
             const vectorField& Cf = patch().Cf();
             vectorField Up(Cf.size(), Zero);
@@ -80,7 +82,7 @@ boundaryField
 
         code
         #{
-            scalar Uf = $Uf;   // starting value, used until the controller has run once
+            scalar Uf = this->db().time().controlDict().get<scalar>("Uf");   // starting value, used until the controller has run once
             if (this->db().foundObject<uniformDimensionedScalarField>("Uframe"))
             {
                 Uf = this->db().lookupObject<uniformDimensionedScalarField>("Uframe").value();

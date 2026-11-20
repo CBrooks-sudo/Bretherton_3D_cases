@@ -150,8 +150,8 @@ functions
 
        codeExecute
        #{
-           const scalar Uf0 = $Uf;
-           const scalar tau = $tauFrame;
+           const scalar Uf0 = mesh().time().controlDict().get<scalar>("Uf");
+           const scalar tau = mesh().time().controlDict().get<scalar>("tauFrame");
            const Time& runTime = mesh().time();
            const scalar dt = runTime.deltaTValue();
 
