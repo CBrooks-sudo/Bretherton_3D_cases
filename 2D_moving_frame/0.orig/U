@@ -38,9 +38,11 @@ boundaryField
 
         code
         #{
-            const scalar Ul = $Ul;
-            const scalar Uf = $Uf;
-            const scalar R  = $R;
+                        // simSetup values, read from controlDict (which #includes simSetup)
+            const dictionary& setup = this->db().time().controlDict();
+            const scalar Ul = setup.get<scalar>("Ul");
+            const scalar Uf = setup.get<scalar>("Uf");
+            const scalar R  = setup.get<scalar>("R");
 
             const vectorField& Cf = patch().Cf();
             vectorField Up(Cf.size(), Zero);
