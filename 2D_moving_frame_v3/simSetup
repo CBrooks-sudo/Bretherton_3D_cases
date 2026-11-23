@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1606+                                |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+/* Flow conditions */
+Ca 0.002; // mul*Ul/sigma
+Re 1.0; // rhol*Ul*D/mul
+densityRatio 1000.0; // rhol/rhog
+viscosityRatio 100.0; // mul/mug
+
+Ul 1.0; //  liquid inlet velocity - hardcoded
+Uf 1.0; // INITIAL frame velocity (v2: the controller adapts it; deliberately not the known answer)
+tauFrame 1.0; // controller response time (critically damped): the frame corrects bubble drift over about this many time units
+rhol 1.0; // liquid density - hardcoded
+
+/* geometry/mesh */
+R 1.0; // pipe radius
+LtoR 30; // pipe length to radius ratio (was 20)
+hWallToR 0.057227235751666; // extension of near-wall refined region to radius ratio
+nx1 60; // number of mesh elements along channel radius in square mesh region
+nx2 14; // number of mesh elements along channel radius in near-wall refined region
+firstToLastAR 0.047565058880896; // Ratio of nearest-wall to farthest-wall mesh element size, calculated via: https://openfoamwiki.net/index.php/Scripts/blockMesh_grading_calculation
+alpha 2.5; // angle of the wedge in degrees
+Co 0.05; // Courant number
+
+/* Initial bubble: a rod of length Lb with spherical caps of radius Rb */
+RbToR 0.9; // Initial bubble radius rescaled with channel radius
+LbToR 6.0; // Initial bubble length rescaled with channel radius
+xb0ToR 12.0; // Centre of rear cap
+
+/* For parallel computations */
+nCores 8;
+
+/* Useful quantities */
+alphaRad #calc "degToRad($alpha)"; // conversion of wedge angle into radiants
+Rfiner #calc "$R*(1.0-$hWallToR)"; // start of near-wall refined region
+L #calc "$R*$LtoR"; // pipe length
+nz #calc "floor($L/($Rfiner/$nx1))"; // mesh elements along pipe length
+UwallX #calc "-1.0*$Uf"; // wall velocity seen from the moving frame
+
+

@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  v2 ADAPTIVE MOVING FRAME: frame-acceleration pseudo-force
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+frameAcceleration
+{
+    // Physical body force in the accelerating frame: f = -rho * aFrame (x direction).
+    // OpenFOAM convention: adding force f means  eqn.source() -= f*V,
+    // so here  eqn.source() += rho * aFrame * V  (x component).
+    type            vectorCodedSource;
+    selectionMode   all;
+    fields          (U);
+    name            frameAcceleration;
+
+    codeInclude
+    #{
+        #include "uniformDimensionedFields.H"
+    #};
+
+    codeCorrect
+    #{
+    #};
+
+    codeAddSup
+    #{
+        scalar a = 0;
+        if (mesh_.foundObject<uniformDimensionedScalarField>("aFrame"))
+        {
+            a = mesh_.lookupObject<uniformDimensionedScalarField>("aFrame").value();
+        }
+        const volScalarField& rhoField = mesh_.lookupObject<volScalarField>("rho");
+
+        eqn.source() += rhoField.primitiveField()*mesh_.V().field()*vector(a, 0, 0);
+
+        if (mesh_.time().timeIndex() % 100 == 0)
+        {
+            Info<< "frameAcceleration (codeAddSup): a = " << a << endl;
+        }
+    #};
+
+    codeAddSupRho
+    #{
+        scalar a = 0;
+        if (mesh_.foundObject<uniformDimensionedScalarField>("aFrame"))
+        {
+            a = mesh_.lookupObject<uniformDimensionedScalarField>("aFrame").value();
+        }
+        const volScalarField& rhoField = mesh_.lookupObject<volScalarField>("rho");
+
+        eqn.source() += rhoField.primitiveField()*mesh_.V().field()*vector(a, 0, 0);
+
+        if (mesh_.time().timeIndex() % 100 == 0)
+        {
+            Info<< "frameAcceleration (codeAddSupRho): a = " << a << endl;
+        }
+    #};
+
+    codeConstrain
+    #{
+    #};
+}
+
+// ************************************************************************* //

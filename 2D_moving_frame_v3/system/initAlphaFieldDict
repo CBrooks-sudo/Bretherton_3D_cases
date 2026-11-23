@@ -1,0 +1,92 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  plus                                  |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+#include "../simSetup"
+
+field "alpha.bubble";
+function composedFunction;
+mode add;
+composedFunction
+{
+    sphere
+    {
+        type sphere;
+        radius #calc "$R*$RbToR";
+        origin (#calc "$R*$xb0ToR" 0 0);
+        scale 1;
+    }
+    
+    sphere2
+    {
+        type sphere;
+        radius #calc "$R*$RbToR";
+        origin (#calc "$R*($xb0ToR+$LbToR)" 0 0);
+        scale 1;
+    }
+    
+    /*cylinder
+    {
+        type cylinde;
+        direction (1 0 0);
+        radius #calc "$R*$RbToR";
+        origin (#calc "$R*($xb0ToR+$LbToR)" 0 0);
+        hello;
+        //scale 1;
+    }*/
+    
+    cylinder
+    {
+        type composedFunction;
+        mode subtract;
+        composedFunction
+        {
+            planes
+            {
+                type composedFunction;
+                mode subtract;
+                composedFunction
+                {
+                    plane1
+                    {
+                        type plane;
+                        origin (#calc "$R*$xb0ToR" 0 0);
+                        normal (1 0 0);
+                    }
+                    
+                    plane2
+                    {
+                        type plane;
+                        origin (#calc "$R*($xb0ToR+$LbToR)" 0 0);
+                        normal (-1 0 0);
+                    }
+                }
+            }    
+            cylinder1
+            {
+                type cylinder;
+                direction (1 0 0);
+                radius #calc "$R*$RbToR";
+                origin (#calc "$R*($xb0ToR+$LbToR)" 0 0);
+            }
+                            
+        }
+                
+    }
+
+}
+
+
+// ************************************************************************* //
