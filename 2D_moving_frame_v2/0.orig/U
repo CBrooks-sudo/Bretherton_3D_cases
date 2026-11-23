@@ -20,7 +20,7 @@ dimensions      [ 0 1 -1 0 0 0 0 ];
 #include "../simSetup"
 
 // liquid initially at rest in the lab frame, i.e. moving at -Uf relative to frame
-internalField uniform ($UwallX 0 0 );
+internalField uniform ($UwallX 0 0);
 
 boundaryField
 {
@@ -32,10 +32,6 @@ boundaryField
         value           uniform ($UwallX 0 0);
         name            movingFrameInlet;
 
-        Ul              $Ul;
-        Uf              $Uf;
-        R               $R
-
         codeInclude
         #{
             #include "uniformDimensionedFields.H"
@@ -43,15 +39,16 @@ boundaryField
 
         code
         #{
-                        // simSetup values, read from controlDict (which #includes simSetup)
+            // simSetup values, read from controlDict (which #includes simSetup)
             const dictionary& setup = this->db().time().controlDict();
             const scalar Ul = setup.get<scalar>("Ul");
-                        scalar Uf = setup.get<scalar>("Uf");   // starting value, used until the controller has run once
+            const scalar R  = setup.get<scalar>("R");
+
+            scalar Uf = setup.get<scalar>("Uf");   // starting value, used until the controller has run once
             if (this->db().foundObject<uniformDimensionedScalarField>("Uframe"))
             {
                 Uf = this->db().lookupObject<uniformDimensionedScalarField>("Uframe").value();
             }
-            const scalar R  = setup.get<scalar>("R");
 
             const vectorField& Cf = patch().Cf();
             vectorField Up(Cf.size(), Zero);
@@ -66,14 +63,12 @@ boundaryField
         #};
     }
 
-        upper_wall
+    upper_wall
     {
         // v2: wall at rest in the lab slides backwards at -Uf(t), Uf taken from the controller
         type            codedFixedValue;
         value           uniform ($UwallX 0 0);
         name            movingFrameWall;
-
-        Uf              $Uf;
 
         codeInclude
         #{
@@ -90,6 +85,7 @@ boundaryField
             operator==(vector(-Uf, 0, 0));
         #};
     }
+
     outlet
     {
         type            zeroGradient;
