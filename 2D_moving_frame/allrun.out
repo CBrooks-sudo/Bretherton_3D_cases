@@ -1,5 +1,0 @@
-Running blockMesh on /home/egycb7/OpenFOAM/egycb7-v2106/run/bretherton/Ca0p01_2Daxi_plicRDF
-Running checkMesh on /home/egycb7/OpenFOAM/egycb7-v2106/run/bretherton/Ca0p01_2Daxi_plicRDF
-Running decomposePar on /home/egycb7/OpenFOAM/egycb7-v2106/run/bretherton/Ca0p01_2Daxi_plicRDF
-Running interFlow (16 processes) on /home/egycb7/OpenFOAM/egycb7-v2106/run/bretherton/Ca0p01_2Daxi_plicRDF 
-Running reconstructPar on /home/egycb7/OpenFOAM/egycb7-v2106/run/bretherton/Ca0p01_2Daxi_plicRDF
